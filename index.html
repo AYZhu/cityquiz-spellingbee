@@ -1,0 +1,212 @@
+<!doctype html>
+<html>
+    <head>
+        <style>
+            body {
+                font-family: Helvetica, sans-serif;
+            }
+        </style>
+    </head>
+<body>
+    <h1>city-quiz spelling bee</h1>
+    <p>us cities w/ over 1000 population acc. some website krit found</p>
+    <h2>letters</h2>
+    <div><span><b id="center" style="font-size: x-large;"></b><p id = "letters" style="font-size: x-large;"></p></span></div>
+    <div><p id="number"></p></div>
+    <form>
+        Enter city: <input type="text" name="city" id="city-input">
+    </form>
+    <div><p id="error"></p></div>
+    <div><p id="sofar"></p></div>
+    <div>
+        <ul id="sofarlist">
+
+        </ul>
+    </div>
+    <button id="die">give up!</button>
+<script type="module">
+        const lettersElement = document.getElementById("letters");
+        const centerElement = document.querySelector("b");
+
+        const pangramsList = await fetch("pangrams.json", {
+            "headers": {
+                "sec-ch-ua": "\"Chromium\";v=\"125\", \"Not.A/Brand\";v=\"24\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"macOS\""
+            },
+            "referrerPolicy": "strict-origin-when-cross-origin",
+            "body": null,
+            "method": "GET",
+            "mode": "cors",
+            "credentials": "omit"
+        });
+        const pangrams = await pangramsList.json();
+
+        let letters = pangrams[Math.floor(Math.random() * pangrams.length)];
+        letters = letters.map(x => x.toLowerCase())
+                         .map(value => ({ value, sort: Math.random() }))
+                        .sort((a, b) => a.sort - b.sort)
+                        .map(({ value }) => value);
+
+
+        // while (letters.length < 7) {
+        //     const next = Math.floor(Math.random() * 26) + 10;
+        //     const letter = next.toString(36);
+        //     if(letters.find(x => x === letter) === undefined) {
+        //         letters.push(letter)
+        //     }
+        // }
+        letters.push(' ');
+        letters.push('-');
+        letters.push("'");
+
+        function scoreName(cityname) {
+            let score = 0;
+            let uniqueLetters = new Set(cityname.toLowerCase());
+            uniqueLetters.delete(' ');
+            uniqueLetters.delete('-');
+            uniqueLetters.delete("'");
+            if (uniqueLetters.size == 7) return 7 + cityname.length;
+            if (cityname.length == 4) return 1;
+            return cityname.length;
+        }  
+        function isPangram(cityname) {
+            let score = 0;
+            let uniqueLetters = new Set(cityname.toLowerCase());
+            uniqueLetters.delete(' ');
+            uniqueLetters.delete('-');
+            uniqueLetters.delete("'");
+            if (uniqueLetters.size == 7) return true;
+            return false;
+        }  
+
+        const lettersFinal = new Set(letters);
+        
+        
+        centerElement.innerText = letters[0];
+        lettersElement.innerText = letters.slice(1, 7).join(" ");
+
+        const formElement = document.querySelector("form");
+        const inputElement = document.querySelector("input");
+        const citiesList = await fetch("cities.json", {
+            "headers": {
+                "sec-ch-ua": "\"Chromium\";v=\"125\", \"Not.A/Brand\";v=\"24\"",
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": "\"macOS\""
+            },
+            "referrerPolicy": "strict-origin-when-cross-origin",
+            "body": null,
+            "method": "GET",
+            "mode": "cors",
+            "credentials": "omit"
+        });
+        const data = await citiesList.json();
+        const x = data.filter(x => x.ascii_name !== null)
+                        .filter(x => x.ascii_name.length >= 4)
+                        .filter(x => new Set(x.ascii_name.toLowerCase()).isSubsetOf(lettersFinal))
+                        .filter(x => new Set(x.ascii_name.toLowerCase()).has(letters[0]));
+ 
+        const xAsCities = new Set(x.map(x => x.ascii_name.toLowerCase()));
+
+        const xDebug = [...xAsCities].sort();
+        xDebug.forEach(x => console.log(`${x}, ${scoreName(x)}`))
+        console.log(xAsCities);
+        console.log(xAsCities.size);
+
+        const numberElement = document.getElementById("number");
+            numberElement.innerText = `There are ${x.length} cities with ${x.reduce((prev, cur) => prev + cur.population, 0)} people in them and max score ${[...xAsCities].reduce((prev, cur) => prev + scoreName(cur), 0)}!`;
+            console.log(x);
+
+        let citiesCount = 0;
+        let pop = 0;
+        let score = 0;
+        let submitted = new Set();
+
+let submit =  (e) => {
+        e.preventDefault();
+
+        const errorElement = document.getElementById("error");
+
+        if(inputElement.value.trim().length == 0) {
+            letters = letters
+                         .map((value, index) => {
+                            if (index == 0) return { value, sort: -1 };
+                            if (index > 6) return { value , sort: index};
+                            return { value, sort: Math.random() };
+                        })
+                        .sort((a, b) => a.sort - b.sort)
+                        .map(({ value }) => value);
+                        centerElement.innerText = letters[0];
+        lettersElement.innerText = letters.slice(1, 7).join(" ");
+        inputElement.value = "";  
+            return; 
+        }
+
+        if(submitted.has(inputElement.value.toLowerCase())) {
+            inputElement.value = "";  
+            errorElement.innerText="you've already done that!";
+            return;
+        }
+
+        let matchCities = x.filter(x => x.ascii_name.toLowerCase() == inputElement.value.toLowerCase());
+
+        if(matchCities.length > 0) {
+            citiesCount += matchCities.length;
+            pop += matchCities.reduce((prev, cur) => prev + cur.population, 0);
+            score += scoreName(inputElement.value.toLowerCase());
+            submitted.add(inputElement.value.toLowerCase());
+            errorElement.innerText="";
+
+            matchCities.forEach(x => {
+                const a = document.createElement("li");
+                const list = document.getElementById("sofarlist");
+                const prefix = isPangram(x.ascii_name) ? '<b>' : '';
+                const postfix = isPangram(x.ascii_name) ? '</b>' : '';
+                a.innerHTML = `${prefix}${x.ascii_name}, ${x.admin1_code} (${x.population})${postfix}`;
+                list.prepend(a);
+            });
+        } else {
+            errorElement.innerText="that's not a city :(";
+        }
+
+        inputElement.value = "";  
+        let soFarElement = document.getElementById("sofar");
+        soFarElement.innerText = `You have found ${citiesCount} cities with ${pop} total population and spelling bee score ${score} thus far.`;      
+        return false;
+}
+
+        const dieElement = document.getElementById("die");
+
+        let dead = (e) => {
+            e.preventDefault();
+            const errorElement = document.getElementById("error");
+            let matchCities = x.filter(x => !submitted.has(x.ascii_name.toLowerCase()));
+
+        if(matchCities.length > 0) {
+            citiesCount += matchCities.length;
+            pop += matchCities.reduce((prev, cur) => prev + cur.population, 0);
+            score += scoreName(inputElement.value.toLowerCase());
+            submitted.add(inputElement.value.toLowerCase());
+            errorElement.innerText="";
+
+            matchCities.forEach(x => {
+                const a = document.createElement("li");
+                const list = document.getElementById("sofarlist");
+                const prefix = '<i>';
+                const postfix = '</i>';
+                a.innerHTML = `${prefix}${x.ascii_name}, ${x.admin1_code} (${x.population})${postfix}`;
+                list.appendChild(a);
+            });
+        } else {
+            errorElement.innerText="that's not a city :(";
+        }
+            const img = document.createElement('img');
+            img.src = 'https://www.alanzhu.me/assets/images/current-mood.png';
+            errorElement.appendChild(img);
+            return false;
+        }
+        formElement.addEventListener('submit', submit);
+        dieElement.addEventListener('click', dead);
+</script>
+</body>
+</html>
